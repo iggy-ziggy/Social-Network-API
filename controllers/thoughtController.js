@@ -1,4 +1,5 @@
-const { Thought } = require("../models");
+const { User, Thought } = require("../models");
+const { findByIdAndUpdate } = require("../models/Thought");
 
 module.exports = {
   // get all thoughts
@@ -12,11 +13,14 @@ module.exports = {
   },
 
   // get one thought
-  async getSingleThought(req, res) {
+  async getOneThought(req, res) {
     try {
       const thought = await Thought.findOne({
         _id: req.params.thoughtId,
       }).select("-__v");
+      if(!thought) {
+        return res.status(404).json({ message: 'No thought with that ID' })
+      }
       res.json(thought);
     } catch (err) {
       res.status(500).json(err);
@@ -24,34 +28,81 @@ module.exports = {
   },
 
   // create new thought
-  // async createThought(req, res) {
-  //     try {
-  //         const newThought = await Thought.create(req.body);
-  //         res.json(newThought);
-  //     } catch (err) {
-  //         res.status(500).json(err);
-  //     }
-  // },
-
   async createThought(req, res) {
     try {
       const thought = await Thought.create(req.body);
-
+  
       const user = await User.findByIdAndUpdate(
         { _id: req.body.userId },
-        // { $push: { thoughts: thought._id } },
         { $addToSet: { thoughts: thought._id } },
         { runValidators: true, new: true }
       );
-
+  
       if (!user) {
-        return res.status(404).json({
-          message: "Application created, but found no user with that ID",
-        });
+        return res
+          .status(404)
+          .json({ message: 'Thought created but no user with this id!' });
+      }
+  
+      res.json({ message: 'Thought successfully created' });
+    } catch (err) {
+      res.json(err);
+    }
+  },
+
+  // update thought
+  async updateThought(req, res) {
+    try {
+      const thought = await Thought.findOneAndUpdate(
+        { _id: req.params.thoughtId  },
+        { $set: req.body },
+        { runValidators: true, new: true }
+      );
+      if (!thought) {
+        return res.status(404).json({ message: "No thought found with this id!" });
+      }
+      res.json(thought);
+    } catch (err) {
+      res.json(err);
+    }
+  },
+
+  // create reaction
+  async createReaction(req, res) {
+    try {
+      const reaction = await Thought.findOneAndUpdate(
+        { _id: req.params.thoughtId },
+        { $addToSet: { reactions: req.body } },
+        { runValidators: true, new: true }
+      );
+
+      if(!reaction) {
+        return res.status(404).json({ message: 'Something went wrong' });
       }
 
-      res.json("Thought created");
+      return res.status(200).json(reaction);
     } catch (err) {
+      console.log(err);
+      res.status(500).json(err);
+    }
+  },
+
+  // delete one reaction
+  async deleteReaction(req, res) {
+    try {
+      const thought = findByIdAndUpdate(
+        { _id: req.params.thoughtId },
+        { $pull: { reactions: { _id: req.params.reactionId } } },
+        { runValidators: true, new: true }
+      );
+
+      if(!thought) {
+        return res.status(404).json({ message: 'No thought found with that ID' });
+      }
+
+      return res.status(200).json(thought);
+    } catch (err) {
+      console.log(err);
       res.status(500).json(err);
     }
   },
@@ -72,5 +123,5 @@ module.exports = {
     }
   },
 
-  // testing
+
 };
